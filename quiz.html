@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Floresta do Código</title>
+<style>
+  :root{
+    --moss:#2f4a35;
+    --moss-dark:#1c2e20;
+    --leaf:#5c8a5a;
+    --bark:#6b4a2f;
+    --bark-dark:#4a3320;
+    --sun:#f2a63d;
+    --sun-light:#f7d488;
+    --parchment:#f3e9cf;
+    --berry:#c2543f;
+    --sky-top:#a9d8c2;
+    --sky-bot:#eef4dc;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    font-family:'Segoe UI','Trebuchet MS',sans-serif;
+    background:var(--moss-dark);
+    overflow-x:hidden;
+  }
+  .stage{
+    position:relative;
+    width:100%;
+    min-height:100vh;
+    background:linear-gradient(180deg,var(--sky-top) 0%, var(--sky-bot) 55%, #dcead0 100%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:18px 10px 40px;
+  }
+  h1.title{
+    font-family:'Trebuchet MS',sans-serif;
+    font-weight:900;
+    letter-spacing:1px;
+    color:var(--moss-dark);
+    font-size:clamp(22px,4.5vw,38px);
+    margin:6px 0 2px;
+    text-shadow:2px 2px 0 var(--sun-light);
+  }
+  .subtitle{
+    color:var(--bark-dark);
+    font-size:clamp(12px,2.2vw,16px);
+    margin:0 0 10px;
+    font-style:italic;
+  }
+  .hud{
+    display:flex;
+    gap:14px;
+    align-items:center;
+    background:var(--parchment);
+    border:3px solid var(--bark);
+    border-radius:14px;
+    padding:8px 18px;
+    margin-bottom:12px;
+    box-shadow:0 4px 0 var(--bark-dark);
+    font-weight:700;
+    color:var(--bark-dark);
+    font-size:clamp(12px,2vw,15px);
+  }
+  .hud span.emoji{font-size:1.3em;}
+  .board-wrap{
+    width:100%;
+    max-width:1000px;
+    position:relative;
+  }
+  svg#board{
+    width:100%;
+    height:auto;
+    display:block;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,0.15));
+  }
+  .station-label{
+    font-size:15px;
+    font-weight:800;
+    fill:var(--bark-dark);
+    pointer-events:none;
+  }
+  .node{
+    cursor:pointer;
+    transition:transform .18s ease;
+    transform-box: fill-box;
+    transform-origin: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    outline:none;
+  }
+  .node:hover{ transform:scale(1.06); }
+  .node.locked{ cursor:not-allowed; }
+  .node.locked:hover{transform:none;}
+  .pulse{
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ filter:drop-shadow(0 0 0px var(--sun)); }
+    50%{ filter:drop-shadow(0 0 12px var(--sun)); }
+  }
+  #player{
+    transition: transform 1.1s cubic-bezier(.55,.06,.4,1.4);
+  }
+
+  /* Modal */
+  .overlay{
+    position:fixed;inset:0;
+    background:rgba(20,30,20,0.55);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:50;
+    padding:16px;
+  }
+  .overlay.show{display:flex;}
+  .sign{
+    background:var(--parchment);
+    border:6px solid var(--bark);
+    border-radius:18px;
+    max-width:480px;
+    width:100%;
+    padding:22px 22px 20px;
+    position:relative;
+    box-shadow:0 10px 0 var(--bark-dark), 0 20px 30px rgba(0,0,0,0.3);
+    text-align:center;
+  }
+  .sign::before{
+    content:"";
+    position:absolute;
+    top:-26px;left:50%;
+    transform:translateX(-50%);
+    width:14px;height:30px;
+    background:var(--bark-dark);
+    border-radius:4px;
+  }
+  .boss-emoji{
+    font-size:56px;
+    display:block;
+    margin-bottom:4px;
+    filter:drop-shadow(0 3px 2px rgba(0,0,0,0.25));
+  }
+  .boss-name{
+    font-weight:900;
+    color:var(--berry);
+    font-size:19px;
+    margin:0 0 2px;
+  }
+  .boss-concept{
+    font-size:12px;
+    color:var(--bark-dark);
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:2px;
+    opacity:.75;
+  }
+  .qdif-badge{
+    display:inline-block;
+    font-size:11px;
+    font-weight:800;
+    color:#fff;
+    background:var(--berry);
+    padding:3px 10px;
+    border-radius:10px;
+    margin-bottom:12px;
+    letter-spacing:.5px;
+  }
+  .question-text{
+    font-size:17px;
+    font-weight:700;
+    color:var(--moss-dark);
+    margin-bottom:16px;
+    line-height:1.4;
+  }
+  .options{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .opt-btn{
+    background:var(--leaf);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:0 4px 0 #3c5f3a;
+    transition:transform .1s ease, box-shadow .1s ease;
+    text-align:left;
+  }
+  .opt-btn:hover{ filter:brightness(1.08); }
+  .opt-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #3c5f3a; }
+  .opt-btn.correct{ background:#3f9142; box-shadow:0 4px 0 #235a25; }
+  .opt-btn.wrong{ background:var(--berry); box-shadow:0 4px 0 #7c3125; animation:shake .35s; }
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    25%{transform:translateX(-6px);}
+    75%{transform:translateX(6px);}
+  }
+  .feedback-msg{
+    margin-top:12px;
+    font-weight:800;
+    min-height:20px;
+    font-size:14px;
+  }
+  .close-tip{
+    font-size:11px;
+    color:var(--bark-dark);
+    opacity:.6;
+    margin-top:10px;
+  }
+  #startOverlay .sign, #celebrateOverlay .sign{ max-width:520px; }
+  .start-emoji{font-size:60px;}
+  .big-btn{
+    margin-top:14px;
+    background:var(--sun);
+    color:var(--bark-dark);
+    border:none;
+    border-radius:12px;
+    padding:14px 26px;
+    font-size:17px;
+    font-weight:900;
+    cursor:pointer;
+    box-shadow:0 5px 0 #b87621;
+    transition:transform .1s ease;
+  }
+  .big-btn:active{transform:translateY(4px); box-shadow:0 1px 0 #b87621;}
+
+  /* Celebration */
+  #celebrateOverlay .sign{
+    background:linear-gradient(160deg,var(--parchment), #fff3d6);
+  }
+  .critters{
+    font-size:34px;
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:6px;
+    margin:14px 0;
+  }
+  .critters span{
+    display:inline-block;
+    animation:bounce 1.6s ease-in-out infinite;
+  }
+  .critters span:nth-child(2n){ animation-delay:.2s; }
+  .critters span:nth-child(3n){ animation-delay:.4s; }
+  @keyframes bounce{
+    0%,100%{transform:translateY(0);}
+    50%{transform:translateY(-10px);}
+  }
+  .leaf{
+    position:fixed;
+    top:-30px;
+    font-size:22px;
+    animation:fall linear forwards;
+    z-index:60;
+    pointer-events:none;
+  }
+  @keyframes fall{
+    to{ transform:translateY(110vh) rotate(360deg); opacity:0.2; }
+  }
+  .progress-track{
+    display:flex;
+    gap:5px;
+    margin-top:6px;
+  }
+  .progress-dot{
+    width:11px;height:11px;border-radius:50%;
+    background:#d8cfa9;
+    border:2px solid var(--bark);
+  }
+  .progress-dot.done{ background:var(--sun); }
+  .sound-toggle{
+    background:var(--sun-light);
+    border:2px solid var(--bark);
+    border-radius:20px;
+    padding:5px 12px;
+    font-weight:800;
+    font-size:12px;
+    cursor:pointer;
+    color:var(--bark-dark);
+    box-shadow:0 3px 0 #b8935a;
+  }
+  .sound-toggle:active{ transform:translateY(2px); box-shadow:0 1px 0 #b8935a; }
+  footer.credit{
+    color:var(--bark-dark);
+    opacity:.55;
+    font-size:11px;
+    margin-top:10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <h1 class="title">🌿 A Floresta do Código 🌿</h1>
+  <p class="subtitle">Vença os 8 guardiões e chegue à clareira da comemoração!</p>
+
+  <div class="hud">
+    <div><span class="emoji">⭐</span> Pontos: <span id="scoreVal">0</span></div>
+    <div><span class="emoji">📍</span> Estação: <span id="stationVal">0</span>/8</div>
+    <div class="progress-track" id="progressTrack"></div>
+    <button class="sound-toggle" id="btnSound" title="Ligar/desligar música">🔊 Música</button>
+  </div>
+
+  <div class="board-wrap">
+    <svg id="board" viewBox="0 0 1000 560" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <footer class="credit">Clique no guardião em destaque para responder e avançar pela trilha.</footer>
+</div>
+
+<!-- START OVERLAY -->
+<div class="overlay show" id="startOverlay">
+  <div class="sign">
+    <span class="start-emoji">🦊🌳🦉</span>
+    <h2 class="boss-name" style="font-size:22px;margin-top:8px;">Bem-vindo à Floresta do Código!</h2>
+    <p class="question-text" style="font-size:15px;">
+      Uma trilha atravessa a floresta com 8 guardiões, cada um dono de um conceito de programação.
+      Responda corretamente para avançar. Alguns guardiões são gentis e deixam você tentar de novo,
+      mas <strong>Tartaruga, Raposa, Lobo, Macaco e Leão</strong> são traiçoeiros: errar com eles
+      te faz voltar casas na trilha! 🐢🦊🐺🐒🦁
+    </p>
+    <button class="big-btn" id="btnStart">Iniciar aventura 🐾</button>
+  </div>
+</div>
+
+<!-- QUESTION OVERLAY -->
+<div class="overlay" id="quizOverlay">
+  <div class="sign">
+    <span class="boss-emoji" id="qEmoji">🦉</span>
+    <p class="boss-name" id="qBossName">Coruja Sábia</p>
+    <p class="boss-concept" id="qConcept">Variáveis</p>
+    <p class="qdif-badge" id="qDif">Nível 1 · Fácil</p>
+    <p class="question-text" id="qText">Pergunta...</p>
+    <div class="options" id="qOptions"></div>
+    <div class="feedback-msg" id="qFeedback"></div>
+    <p class="close-tip">Escolha uma alternativa para responder ao guardião.</p>
+  </div>
+</div>
+
+<!-- CELEBRATION OVERLAY -->
+<div class="overlay" id="celebrateOverlay">
+  <div class="sign">
+    <h2 class="boss-name" style="font-size:24px;">🎉 Você atravessou a floresta! 🎉</h2>
+    <p class="question-text">
+      Todos os guardiões foram vencidos. A clareira se enche de vida, e os bichos herbívoros
+      saem para celebrar com você!
+    </p>
+    <div class="critters">
+      <span>🦌</span><span>🐇</span><span>🐘</span><span>🦒</span><span>🐐</span>
+      <span>🐑</span><span>🐴</span><span>🐄</span><span>🦓</span><span>🐨</span>
+    </div>
+    <p style="font-weight:800;color:var(--moss-dark);" id="finalScoreMsg">Pontuação final: 0</p>
+    <button class="big-btn" id="btnReplay">Jogar novamente 🌱</button>
+  </div>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const stations = [
+  { x:120, y:150, emoji:"🦉", boss:"Coruja Sábia", concept:"Variáveis", dif:"Nível 1 · Fácil",
+    q:"O que é uma variável em programação?",
+    opts:["Um espaço para guardar e nomear um valor","Um tipo de imagem no programa","Um erro de sintaxe"],
+    correct:0 },
+  { x:280, y:90, emoji:"🐿️", boss:"Esquilo Guardião", concept:"Tipos de Dados", dif:"Nível 2 · Fácil",
+    q:"Se eu quiser guardar a idade de uma pessoa (um número), qual tipo de dado devo usar?",
+    opts:["Texto (String)","Número (Inteiro)","Verdadeiro ou Falso (Booleano)"],
+    correct:1 },
+  { x:440, y:130, emoji:"🐢", boss:"Tartaruga Repetidora", concept:"Laços de Repetição", dif:"Nível 3 · Médio",
+    q:"Para desenhar um quadrado, repito o comando 'andar e virar' 4 vezes seguidas. Qual estrutura devo usar?",
+    opts:["Condicional (se/então)","Repetição (loop)","Uma variável"],
+    correct:1 },
+  { x:600, y:80, emoji:"🦊", boss:"Raposa Decisora", concept:"Condicionais", dif:"Nível 4 · Médio",
+    q:"Se a senha estiver certa o jogo deixa entrar, e se estiver errada mostra 'tente de novo'. Qual estrutura faz isso?",
+    opts:["Repetição (loop)","Uma função","Condicional (se/então)"],
+    correct:2 },
+  { x:760, y:150, emoji:"🐻", boss:"Urso Organizador", concept:"Listas e Vetores", dif:"Nível 5 · Médio",
+    q:"Quero guardar, em ordem, o nome dos 5 alunos da turma em um único lugar. O que devo usar?",
+    opts:["Uma variável sozinha","Uma lista (vetor)","Um comentário"],
+    correct:1 },
+  { x:860, y:290, emoji:"🐺", boss:"Lobo Sequencial", concept:"Algoritmos", dif:"Nível 6 · Difícil",
+    q:"Para fazer um suco, os passos são: (1) bater no liquidificador, (2) colocar a fruta e a água, (3) servir no copo. Qual é a ordem correta do algoritmo?",
+    opts:["3, 2, 1","2, 1, 3","1, 3, 2"],
+    correct:1 },
+  { x:740, y:410, emoji:"🐒", boss:"Macaco Detetive", concept:"Depuração (Debug)", dif:"Nível 7 · Difícil",
+    q:"Um programa deveria mostrar '2 + 2 = 4', mas está mostrando '2 + 2 = 5'. O que isso indica e o que fazer?",
+    opts:["Está tudo certo, pode deixar assim","É um bug (erro): preciso encontrar e corrigir","É um novo tipo de número"],
+    correct:1 },
+  { x:560, y:460, emoji:"🦁", boss:"Leão Rei da Floresta", concept:"Funções", dif:"Nível 8 · Desafio Final",
+    q:"Uma função chamada 'dobro' recebe um número e devolve o dobro dele. Se eu usar 'dobro' com o número 5, qual é o resultado?",
+    opts:["5","10","25"],
+    correct:1 },
+];
+const START = {x:40,y:190};
+const FINISH = {x:340,y:480};
+
+/* Penalidades por guardião (índice da estação, 0-based):
+   2 = Tartaruga Repetidora  -> volta ao início
+   3 = Raposa Decisora       -> volta 2 casas
+   5 = Lobo Sequencial       -> volta ao início
+   6 = Macaco Detetive       -> volta para a casa do Urso (idx 4)
+   7 = Leão Rei da Floresta  -> volta 3 casas
+*/
+const penalties = {
+  2: { type:"toStart", msg:"A Tartaruga Repetidora te deixou tonto(a) de tantas voltas! Você volta para o início da trilha." },
+  3: { type:"back", amount:2, msg:"A Raposa Decisora foi mais esperta dessa vez! Você volta 2 casas." },
+  5: { type:"toStart", msg:"O Lobo Sequencial embaralhou sua ordem! Você volta para o início da trilha." },
+  6: { type:"toIndex", index:4, msg:"O Macaco Detetive achou um bug gigante! Você volta para a casa do Urso Organizador." },
+  7: { type:"back", amount:3, msg:"O Leão Rei da Floresta rugiu bem forte! Você volta 3 casas." },
+};
+
+/* ---------- STATE ---------- */
+let current = 0;   // index of next station to beat (0..8)
+let score = 0;
+let scoredStations = new Array(stations.length).fill(false); // evita pontuar 2x a mesma estação
+
+/* ---------- BUILD PROGRESS DOTS ---------- */
+const progressTrack = document.getElementById('progressTrack');
+for(let i=0;i<8;i++){
+  const d = document.createElement('div');
+  d.className='progress-dot';
+  d.id='dot'+i;
+  progressTrack.appendChild(d);
+}
+
+/* ---------- BUILD SVG BOARD ---------- */
+const svg = document.getElementById('board');
+const NS = "http://www.w3.org/2000/svg";
+
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function buildPathD(points){
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for(let i=1;i<points.length;i++){
+    const p0 = points[i-1], p1=points[i];
+    const mx=(p0.x+p1.x)/2, my=(p0.y+p1.y)/2;
+    d += ` Q ${p0.x} ${p0.y} ${mx} ${my}`;
+  }
+  d += ` T ${points[points.length-1].x} ${points[points.length-1].y}`;
+  return d;
+}
+
+const allPts = [START, ...stations, FINISH];
+
+// background sky already via CSS; draw hills
+svg.appendChild(el('ellipse',{cx:150,cy:520,rx:260,ry:90,fill:'#4a6e4d',opacity:.55}));
+svg.appendChild(el('ellipse',{cx:500,cy:540,rx:320,ry:100,fill:'#3d5e42',opacity:.5}));
+svg.appendChild(el('ellipse',{cx:830,cy:500,rx:260,ry:90,fill:'#4a6e4d',opacity:.55}));
+
+// scattered trees
+const treeSpots = [[60,60],[200,40],[350,60],[500,40],[650,30],[800,60],[930,120],[950,250],
+                   [900,400],[780,500],[620,510],[460,510],[250,530],[90,470],[40,320],[60,220]];
+treeSpots.forEach(([tx,ty])=>{
+  const g = el('g',{});
+  g.appendChild(el('circle',{cx:tx,cy:ty,r:16,fill:'#3f6b45'}));
+  g.appendChild(el('circle',{cx:tx-10,cy:ty+8,r:12,fill:'#4d7d52'}));
+  g.appendChild(el('circle',{cx:tx+10,cy:ty+8,r:12,fill:'#4d7d52'}));
+  g.appendChild(el('rect',{x:tx-3,y:ty+10,width:6,height:14,fill:'#6b4a2f'}));
+  svg.appendChild(g);
+});
+
+// road path (double stroke for dirt-road look)
+const pathD = buildPathD(allPts);
+svg.appendChild(el('path',{d:pathD, fill:'none', stroke:'#8a6a45', 'stroke-width':26, 'stroke-linecap':'round'}));
+svg.appendChild(el('path',{d:pathD, fill:'none', stroke:'#c9a86a', 'stroke-width':18, 'stroke-linecap':'round'}));
+svg.appendChild(el('path',{d:pathD, fill:'none', stroke:'#e8d3a3', 'stroke-width':4, 'stroke-dasharray':'10 10', 'stroke-linecap':'round'}));
+
+// start marker
+const startG = el('g',{});
+startG.appendChild(el('circle',{cx:START.x,cy:START.y,r:22,fill:'#f2a63d',stroke:'#6b4a2f','stroke-width':4}));
+startG.appendChild(el('text',{x:START.x,y:START.y+6,'text-anchor':'middle','font-size':18},));
+startG.querySelector('text').textContent="🏁";
+svg.appendChild(startG);
+svg.appendChild(el('text',{x:START.x,y:START.y-32,'text-anchor':'middle','class':'station-label'})).textContent="SAÍDA";
+
+// finish marker
+const finishG = el('g',{});
+finishG.appendChild(el('circle',{cx:FINISH.x,cy:FINISH.y,r:26,fill:'#7fbf7a',stroke:'#2f4a35','stroke-width':4}));
+const finishText = el('text',{x:FINISH.x,y:FINISH.y+8,'text-anchor':'middle','font-size':22});
+finishText.textContent="🌟";
+finishG.appendChild(finishText);
+svg.appendChild(finishG);
+const finishLabel = el('text',{x:FINISH.x,y:FINISH.y+46,'text-anchor':'middle','class':'station-label'});
+finishLabel.textContent="CHEGADA";
+svg.appendChild(finishLabel);
+
+// station nodes
+const nodeEls = [];
+stations.forEach((s, idx)=>{
+  const g = el('g',{class:'node locked', id:'node'+idx});
+  const circle = el('circle',{cx:s.x, cy:s.y, r:26, fill:'#f3e9cf', stroke:'#6b4a2f','stroke-width':4});
+  const numBg = el('circle',{cx:s.x+18, cy:s.y-18, r:11, fill:'#c2543f'});
+  const numText = el('text',{x:s.x+18, y:s.y-14, 'text-anchor':'middle','font-size':13, fill:'#fff','font-weight':'800'});
+  numText.textContent = idx+1;
+  const emojiText = el('text',{x:s.x, y:s.y+9, 'text-anchor':'middle','font-size':26});
+  emojiText.textContent = s.emoji;
+  g.appendChild(circle);
+  g.appendChild(emojiText);
+  g.appendChild(numBg);
+  g.appendChild(numText);
+  const label = el('text',{x:s.x, y:s.y+46, 'text-anchor':'middle','class':'station-label'});
+  label.textContent = s.boss.split(' ')[0];
+  g.appendChild(label);
+  g.addEventListener('click', ()=>tryOpenStation(idx));
+  svg.appendChild(g);
+  nodeEls.push(g);
+});
+
+// player token
+const playerG = el('g',{id:'player'});
+const playerCircle = el('circle',{cx:0,cy:0,r:17,fill:'#fff','stroke':'#2f4a35','stroke-width':3});
+const playerEmoji = el('text',{x:0,y:6,'text-anchor':'middle','font-size':20});
+playerEmoji.textContent="🐾";
+playerG.appendChild(playerCircle);
+playerG.appendChild(playerEmoji);
+svg.appendChild(playerG);
+
+function positionPlayer(px,py, animate=true){
+  playerG.style.transition = animate ? 'transform 1.1s cubic-bezier(.55,.06,.4,1.4)' : 'none';
+  playerG.style.transform = `translate(${px}px, ${py-34}px)`;
+}
+// place initial (offset so it's not literally on top of node)
+positionPlayer(START.x, START.y, false);
+
+function refreshLocks(){
+  nodeEls.forEach((g, idx)=>{
+    g.classList.remove('pulse');
+    if(idx < current){
+      g.classList.remove('locked');
+      g.style.opacity = 0.55;
+    } else if(idx === current){
+      g.classList.remove('locked');
+      g.classList.add('pulse');
+      g.style.opacity = 1;
+    } else {
+      g.classList.add('locked');
+      g.style.opacity = 0.35;
+    }
+  });
+}
+refreshLocks();
+
+/* ---------- ÁUDIO (sintetizado via Web Audio API, sem arquivos externos) ---------- */
+let audioCtx = null;
+let musicGain = null;
+let sfxGain = null;
+let soundOn = true;
+let musicOn = false;
+let musicTimer = null;
+
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  musicGain = audioCtx.createGain();
+  musicGain.gain.value = 0.10;
+  musicGain.connect(audioCtx.destination);
+  sfxGain = audioCtx.createGain();
+  sfxGain.gain.value = 0.55;
+  sfxGain.connect(audioCtx.destination);
+}
+
+/* --- música de fundo: melodia fofa em pentatônica, tocada em loop --- */
+const scale = [261.63,293.66,329.63,392.00,440.00,523.25]; // C D E G A C
+const melodyPattern = [
+  {n:0,d:0.32},{n:2,d:0.32},{n:4,d:0.32},{n:2,d:0.32},
+  {n:5,d:0.32},{n:4,d:0.32},{n:2,d:0.32},{n:0,d:0.32},
+  {n:3,d:0.32},{n:4,d:0.32},{n:3,d:0.32},{n:2,d:0.32},
+  {n:0,d:0.55},{n:null,d:0.4},
+];
+let melodyStep = 0;
+
+function playMusicNote(freq, dur, offset=0, type='triangle'){
+  const t = audioCtx.currentTime + offset;
+  const osc = audioCtx.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.9, t+0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(g); g.connect(musicGain);
+  osc.start(t); osc.stop(t+dur+0.05);
+}
+
+function playPad(freq, dur, offset=0){
+  const t = audioCtx.currentTime + offset;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.35, t+0.15);
+  g.gain.setValueAtTime(0.35, t+dur-0.2);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(g); g.connect(musicGain);
+  osc.start(t); osc.stop(t+dur+0.05);
+}
+
+function scheduleMelodyStep(){
+  if(!musicOn) return;
+  const note = melodyPattern[melodyStep % melodyPattern.length];
+  if(note.n !== null) playMusicNote(scale[note.n], note.d*0.92);
+  musicTimer = setTimeout(()=>{ melodyStep++; scheduleMelodyStep(); }, note.d*1000);
+}
+
+function startMusic(){
+  if(!audioCtx) return;
+  musicOn = true;
+  scheduleMelodyStep();
+}
+function stopMusic(){
+  musicOn = false;
+  clearTimeout(musicTimer);
+}
+
+/* --- música de vitória: fanfarra animada, tocada uma vez ao vencer --- */
+const victoryNotes = [
+  {f:523.25,d:0.16},{f:523.25,d:0.16},{f:523.25,d:0.16},
+  {f:659.25,d:0.38},
+  {f:587.33,d:0.16},{f:659.25,d:0.16},
+  {f:783.99,d:0.55},
+  {f:null,d:0.12},
+  {f:783.99,d:0.16},{f:880.00,d:0.16},{f:783.99,d:0.16},
+  {f:659.25,d:0.6},
+  {f:null,d:0.1},
+  {f:783.99,d:0.16},{f:880.00,d:0.16},{f:987.77,d:0.16},
+  {f:1046.5,d:0.75},
+];
+function playVictoryMusic(){
+  if(!audioCtx || !soundOn) return;
+  stopMusic();
+  let t = 0;
+  let total = 0;
+  victoryNotes.forEach(n=>{ total += n.d; });
+  playPad(130.81, total+0.3, 0);       // C3 - base quente
+  playPad(196.00, total+0.3, 0);       // G3 - quinta
+  victoryNotes.forEach(note=>{
+    if(note.f) playMusicNote(note.f, note.d*0.95, t, 'square');
+    t += note.d;
+  });
+}
+function toggleSound(){
+  initAudio();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  soundOn = !soundOn;
+  if(soundOn) startMusic(); else stopMusic();
+  document.getElementById('btnSound').textContent = soundOn ? '🔊 Música' : '🔇 Música';
+}
+document.getElementById('btnSound').addEventListener('click', toggleSound);
+
+/* --- efeitos sonoros dos guardiões (sons de animais sintetizados) --- */
+function playTone(freq, dur, type='sine', startTime=0, gainPeak=0.6){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime + startTime;
+  const osc = audioCtx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gainPeak, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(g); g.connect(sfxGain);
+  osc.start(t); osc.stop(t+dur+0.03);
+}
+
+function playGlide(freqStart, freqEnd, dur, type='sine', startTime=0, gainPeak=0.6){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime + startTime;
+  const osc = audioCtx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freqStart, t);
+  osc.frequency.linearRampToValueAtTime(freqEnd, t+dur);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gainPeak, t+0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(g); g.connect(sfxGain);
+  osc.start(t); osc.stop(t+dur+0.03);
+}
+
+function noiseBurst(dur, startTime=0, gainPeak=0.45){
+  if(!audioCtx) return;
+  const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*dur));
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 500;
+  const g = audioCtx.createGain();
+  const t = audioCtx.currentTime + startTime;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gainPeak, t+0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  noise.connect(filter); filter.connect(g); g.connect(sfxGain);
+  noise.start(t); noise.stop(t+dur+0.03);
+}
+
+function soundOwl(){        // coruja: "hoo hoo" grave
+  playTone(300,0.35,'sine',0,0.55);
+  playTone(255,0.45,'sine',0.4,0.55);
+}
+function soundSquirrel(){   // esquilo: bipes rápidos e agudos
+  for(let i=0;i<6;i++) playTone(1300+Math.random()*450, 0.06,'square', i*0.09, 0.28);
+}
+function soundTurtle(){     // tartaruga: som grave e arrastado (bem devagar)
+  playGlide(230,110,1.0,'sine',0,0.45);
+}
+function soundFox(){        // raposa: "yip" curto e agudo
+  playGlide(950,1500,0.12,'sawtooth',0,0.45);
+  playGlide(1450,700,0.16,'sawtooth',0.15,0.45);
+}
+function soundBear(){       // urso: rosnado grave
+  playTone(90,0.55,'sawtooth',0,0.45);
+  playTone(96,0.55,'sawtooth',0.05,0.28);
+}
+function soundWolf(){       // lobo: uivo subindo e descendo
+  playGlide(200,650,0.5,'sine',0,0.55);
+  playTone(650,0.55,'sine',0.5,0.45);
+  playGlide(650,300,0.4,'sine',1.05,0.45);
+}
+function soundMonkey(){     // macaco: "u-u-a-a" alternado
+  playTone(500,0.11,'square',0,0.35);
+  playTone(700,0.11,'square',0.15,0.35);
+  playTone(520,0.11,'square',0.32,0.35);
+  playTone(720,0.11,'square',0.47,0.35);
+}
+function soundLion(){       // leão: rugido grave com ruído
+  playTone(80,0.75,'sawtooth',0,0.55);
+  noiseBurst(0.75,0.05,0.45);
+}
+
+const bossSounds = [soundOwl, soundSquirrel, soundTurtle, soundFox, soundBear, soundWolf, soundMonkey, soundLion];
+
+function playBossSound(idx){
+  if(!soundOn || !audioCtx) return;
+  const fn = bossSounds[idx];
+  if(fn) fn();
+}
+
+
+const quizOverlay = document.getElementById('quizOverlay');
+const qEmoji = document.getElementById('qEmoji');
+const qBossName = document.getElementById('qBossName');
+const qConcept = document.getElementById('qConcept');
+const qText = document.getElementById('qText');
+const qOptions = document.getElementById('qOptions');
+const qFeedback = document.getElementById('qFeedback');
+
+function tryOpenStation(idx){
+  if(idx !== current) return; // only current station is playable
+  openQuiz(idx);
+}
+
+function openQuiz(idx){
+  const s = stations[idx];
+  qEmoji.textContent = s.emoji;
+  qBossName.textContent = s.boss;
+  qConcept.textContent = s.concept;
+  document.getElementById('qDif').textContent = s.dif;
+  qText.textContent = s.q;
+  qFeedback.textContent = "";
+  qOptions.innerHTML = "";
+  playBossSound(idx);
+  const letters = ["A","B","C"];
+  s.opts.forEach((opt, oi)=>{
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.textContent = `${letters[oi]}) ${opt}`;
+    btn.addEventListener('click', ()=>answer(idx, oi, btn));
+    qOptions.appendChild(btn);
+  });
+  quizOverlay.classList.add('show');
+}
+
+function answer(idx, chosen, btn){
+  const s = stations[idx];
+  const buttons = qOptions.querySelectorAll('.opt-btn');
+  buttons.forEach(b=>b.disabled = true);
+  playBossSound(idx);
+  if(chosen === s.correct){
+    btn.classList.add('correct');
+    qFeedback.style.color = '#2c6b2e';
+    qFeedback.textContent = `Correto! ${s.boss} foi vencido(a)! 🎉`;
+    if(!scoredStations[idx]){
+      scoredStations[idx] = true;
+      score += 10;
+      document.getElementById('scoreVal').textContent = score;
+    }
+    setTimeout(()=>{
+      quizOverlay.classList.remove('show');
+      advance(idx);
+    }, 900);
+    return;
+  }
+
+  // resposta errada
+  const penalty = penalties[idx];
+  if(!penalty){
+    // guardiões sem penalidade: só tenta de novo
+    btn.classList.add('wrong');
+    qFeedback.style.color = '#a4382b';
+    qFeedback.textContent = "Ops! Não foi dessa vez. Tente novamente!";
+    setTimeout(()=>{
+      buttons.forEach(b=>{ b.disabled=false; b.classList.remove('wrong'); });
+      qFeedback.textContent = "";
+    }, 900);
+    return;
+  }
+
+  // guardião com penalidade: aplica o retrocesso
+  btn.classList.add('wrong');
+  qFeedback.style.color = '#a4382b';
+  qFeedback.textContent = penalty.msg;
+  setTimeout(()=>{
+    quizOverlay.classList.remove('show');
+    applyPenalty(idx, penalty);
+  }, 1300);
+}
+
+function applyPenalty(idx, penalty){
+  let newCurrent;
+  if(penalty.type === "toStart"){
+    newCurrent = 0;
+  } else if(penalty.type === "toIndex"){
+    newCurrent = penalty.index;
+  } else if(penalty.type === "back"){
+    newCurrent = Math.max(0, idx - penalty.amount);
+  } else {
+    newCurrent = current;
+  }
+
+  current = newCurrent;
+  document.getElementById('stationVal').textContent = current;
+
+  // desmarca os pontinhos de progresso das estações que precisam ser refeitas
+  for(let i=0;i<stations.length;i++){
+    if(i >= current) document.getElementById('dot'+i).classList.remove('done');
+  }
+
+  // player fica posicionado sobre a estação "current" (a próxima a vencer);
+  // se current voltou a 0, o ponto é o próprio início da trilha (SAÍDA)
+  const targetPoint = current === 0 ? START : stations[current];
+  positionPlayer(targetPoint.x, targetPoint.y, true);
+  refreshLocks();
+}
+
+function advance(idx){
+  current = idx+1;
+  document.getElementById('stationVal').textContent = current;
+  document.getElementById('dot'+idx).classList.add('done');
+  const target = idx+1 < stations.length ? stations[idx+1] : FINISH;
+  positionPlayer(stations[idx].x, stations[idx].y, true);
+  setTimeout(()=>{
+    positionPlayer(target.x, target.y, true);
+  }, 50);
+  refreshLocks();
+  if(current >= stations.length){
+    setTimeout(()=>{ celebrate(); }, 1300);
+  }
+}
+
+/* ---------- CELEBRATION ---------- */
+function celebrate(){
+  document.getElementById('finalScoreMsg').textContent = `Pontuação final: ${score} / 80`;
+  document.getElementById('celebrateOverlay').classList.add('show');
+  spawnLeaves(28);
+  playVictoryMusic();
+}
+
+function spawnLeaves(n){
+  const leafEmojis = ["🍃","🍂","🌿"];
+  for(let i=0;i<n;i++){
+    setTimeout(()=>{
+      const leaf = document.createElement('div');
+      leaf.className='leaf';
+      leaf.textContent = leafEmojis[Math.floor(Math.random()*leafEmojis.length)];
+      leaf.style.left = Math.random()*100+'vw';
+      leaf.style.animationDuration = (3+Math.random()*3)+'s';
+      leaf.style.fontSize = (16+Math.random()*14)+'px';
+      document.body.appendChild(leaf);
+      setTimeout(()=>leaf.remove(), 7000);
+    }, i*180);
+  }
+}
+
+/* ---------- START / REPLAY ---------- */
+document.getElementById('btnStart').addEventListener('click', ()=>{
+  document.getElementById('startOverlay').classList.remove('show');
+  initAudio();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  startMusic();
+});
+
+document.getElementById('btnReplay').addEventListener('click', ()=>{
+  current = 0;
+  score = 0;
+  scoredStations = new Array(stations.length).fill(false);
+  document.getElementById('scoreVal').textContent = 0;
+  document.getElementById('stationVal').textContent = 0;
+  for(let i=0;i<8;i++) document.getElementById('dot'+i).classList.remove('done');
+  positionPlayer(START.x, START.y, false);
+  refreshLocks();
+  document.getElementById('celebrateOverlay').classList.remove('show');
+  melodyStep = 0;
+  if(soundOn) startMusic();
+});
+</script>
+</body>
+</html>
